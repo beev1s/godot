@@ -68,7 +68,7 @@ bool SubViewportContainer::is_stretch_enabled() const {
 }
 
 void SubViewportContainer::set_stretch_shrink(int p_shrink) {
-	ERR_FAIL_COND(p_shrink < 1);
+	ERR_FAIL_COND(p_shrink < 0);
 	if (shrink == p_shrink) {
 		return;
 	}
@@ -80,7 +80,7 @@ void SubViewportContainer::set_stretch_shrink(int p_shrink) {
 }
 
 void SubViewportContainer::recalc_force_viewport_sizes() {
-	if (!stretch) {
+	if (!stretch || shrink == 0) {
 		return;
 	}
 
@@ -97,6 +97,18 @@ void SubViewportContainer::recalc_force_viewport_sizes() {
 
 int SubViewportContainer::get_stretch_shrink() const {
 	return shrink;
+}
+
+Vector2 SubViewportContainer::get_stretch_shrink_ratio() const {
+	SubViewport *c;
+	for (int i = 0; i < get_child_count(); i++) {
+		c = Object::cast_to<SubViewport>(get_child(i));
+		if (c) {
+			break;
+		}
+	}
+	ERR_FAIL_NULL_V(c, Vector2());
+	return get_size() / Vector2(c->get_size());
 }
 
 Vector<int> SubViewportContainer::get_allowed_size_flags_horizontal() const {
@@ -217,13 +229,7 @@ void SubViewportContainer::gui_input(const Ref<InputEvent> &p_event) {
 		}
 	}
 
-	if (stretch && shrink > 1) {
-		Transform2D xform;
-		xform.scale(Vector2(1, 1) / shrink);
-		_send_event_to_viewports(p_event->xformed_by(xform));
-	} else {
-		_send_event_to_viewports(p_event);
-	}
+	_send_event_to_viewports(p_event);
 }
 
 void SubViewportContainer::_send_event_to_viewports(const Ref<InputEvent> &p_event) {
@@ -233,7 +239,13 @@ void SubViewportContainer::_send_event_to_viewports(const Ref<InputEvent> &p_eve
 			continue;
 		}
 
-		c->push_input(p_event);
+		if (stretch && shrink != 1) {
+			Transform2D xform;
+			xform.scale(Vector2(c->get_size()) / get_size());
+			c->push_input(p_event->xformed_by(xform));
+		} else {
+			c->push_input(p_event);
+		}
 	}
 }
 
@@ -287,7 +299,7 @@ void SubViewportContainer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_stretch_shrink"), &SubViewportContainer::get_stretch_shrink);
 
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "stretch"), "set_stretch", "is_stretch_enabled");
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "stretch_shrink", PROPERTY_HINT_RANGE, "1,32,1,or_greater"), "set_stretch_shrink", "get_stretch_shrink");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "stretch_shrink", PROPERTY_HINT_RANGE, "0,32,1,or_greater"), "set_stretch_shrink", "get_stretch_shrink");
 
 	GDVIRTUAL_BIND(_propagate_input_event, "event");
 }

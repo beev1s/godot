@@ -70,6 +70,8 @@ public:
 
 	PackedStringArray get_configuration_warnings() const override;
 
+	Vector2 get_stretch_shrink_ratio() const;
+
 	SubViewportContainer();
 };
 
