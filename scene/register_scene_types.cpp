@@ -892,6 +892,7 @@ void register_scene_types() {
 	/* REGISTER 2D */
 
 	GDREGISTER_CLASS(Node2D);
+	GDREGISTER_CLASS(ControlCanvasGroup);
 	GDREGISTER_CLASS(CanvasGroup);
 	GDREGISTER_CLASS(CPUParticles2D);
 	GDREGISTER_CLASS(GPUParticles2D);
