@@ -1868,7 +1868,7 @@ void CanvasItem::set_clip_children_mode(ClipChildrenMode p_clip_mode) {
 
 	update_configuration_warnings();
 
-	if (Object::cast_to<CanvasGroup>(this) != nullptr) {
+	if (Object::cast_to<CanvasGroup>(this) != nullptr || Object::cast_to<ControlCanvasGroup>(this) != nullptr) {
 		//avoid accidental bugs, make this not work on CanvasGroup
 		return;
 	}
