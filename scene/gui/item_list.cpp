@@ -952,10 +952,10 @@ void ItemList::gui_input(const Ref<InputEvent> &p_event) {
 				}
 			}
 
-			if (current >= current_columns) {
-				int next = current - current_columns;
+			if (current >= current_columns - 1) {
+				int next = current - 1;
 				while (next >= 0 && !CAN_SELECT(next)) {
-					next = next - current_columns;
+					next = next - 1;
 				}
 				if (next < 0) {
 					accept_event();
@@ -998,10 +998,10 @@ void ItemList::gui_input(const Ref<InputEvent> &p_event) {
 				}
 			}
 
-			if (current < items.size() - current_columns) {
-				int next = current + current_columns;
+			if (current < items.size()) {
+				int next = current + 1;
 				while (next < items.size() && !CAN_SELECT(next)) {
-					next = next + current_columns;
+					next = next + 1;
 				}
 				if (next >= items.size()) {
 					accept_event();
@@ -1057,13 +1057,40 @@ void ItemList::gui_input(const Ref<InputEvent> &p_event) {
 		else if (p_event->is_action("ui_left", true)) {
 			search_string = ""; //any mousepress cancels
 
-			if (current % current_columns != 0) {
-				int current_row = current / current_columns;
-				int next = current - 1;
-				while (next >= 0 && !CAN_SELECT(next)) {
-					next = next - 1;
+			int current_column = items[current].column;
+			if (current_column > 0) {
+				int next = -1;
+				{
+					int next_iter = current - 1;
+					while (items[next_iter].column == current_column) {
+						next_iter -= 1;
+					}
+					float min_distance = 1e10;
+					int next_column = items[next_iter].column;
+					while (next_iter >= 0) {
+						if (!CAN_SELECT(next_iter)) {
+							next_iter -= 1;
+							continue;
+						}
+
+						// If all elements in the next column have been checked, use the element that has been found
+						if (next_column != items[next_iter].column) {
+							if (next > 0) {
+								break;
+							}
+							next_column = items[next_iter].column;
+						}
+
+						float distance = Math::abs(items[next_iter].rect_cache.position.y - items[current].rect_cache.position.y);
+						if (distance < min_distance) {
+							next = next_iter;
+							min_distance = distance;
+						}
+						next_iter -= 1;
+					}
 				}
-				if (next < 0 || !IS_SAME_ROW(next, current_row)) {
+
+				if (next < 0) {
 					accept_event();
 					return;
 				}
@@ -1072,8 +1099,8 @@ void ItemList::gui_input(const Ref<InputEvent> &p_event) {
 				if (select_mode == SELECT_SINGLE) {
 					emit_signal(SceneStringName(item_selected), current);
 				}
-				accept_event();
 			}
+			accept_event();
 		}
 
 		// Shift Right Selection.
@@ -1086,23 +1113,45 @@ void ItemList::gui_input(const Ref<InputEvent> &p_event) {
 		else if (p_event->is_action("ui_right", true)) {
 			search_string = ""; //any mousepress cancels
 
-			if (current % current_columns != (current_columns - 1) && current + 1 < items.size()) {
-				int current_row = current / current_columns;
-				int next = current + 1;
-				while (next < items.size() && !CAN_SELECT(next)) {
-					next = next + 1;
-				}
-				if (items.size() <= next || !IS_SAME_ROW(next, current_row)) {
-					accept_event();
-					return;
+			int current_column = items[current].column;
+			if (current_column < current_columns - 1) {
+				int next = -1;
+				{
+					int next_iter = current + 1;
+					while (items[next_iter].column == current_column) {
+						next_iter += 1;
+					}
+					float min_distance = 1e10;
+					int next_column = items[next_iter].column;
+					while (next_iter < items.size()) {
+						if (!CAN_SELECT(next_iter)) {
+							next_iter += 1;
+							continue;
+						}
+
+						// If all elements in the next column have been checked, use the element that has been found
+						if (next_column != items[next_iter].column) {
+							if (next > 0) {
+								break;
+							}
+							next_column = items[next_iter].column;
+						}
+
+						float distance = Math::abs(items[next_iter].rect_cache.position.y - items[current].rect_cache.position.y);
+						if (distance < min_distance) {
+							next = next_iter;
+							min_distance = distance;
+						}
+						next_iter += 1;
+					}
 				}
 				set_current(next);
 				ensure_current_is_visible();
 				if (select_mode == SELECT_SINGLE) {
 					emit_signal(SceneStringName(item_selected), current);
 				}
-				accept_event();
 			}
+			accept_event();
 		} else if (p_event->is_action("ui_cancel", true)) {
 			search_string = "";
 		} else if (p_event->is_action("ui_select", true) && (select_mode == SELECT_MULTI || select_mode == SELECT_TOGGLE)) {
@@ -1795,9 +1844,9 @@ void ItemList::force_update_list_size() {
 		items.write[i].accessibility_item_dirty = true;
 	}
 
-	int fit_size = size.x - theme_cache.panel_style->get_minimum_size().width;
+	int fit_size = size.y - theme_cache.panel_style->get_minimum_size().height;
 	if (!wraparound_items) {
-		fit_size += (scroll_bar_h->get_max() - scroll_bar_h->get_page());
+		fit_size += (scroll_bar_v->get_max() - scroll_bar_v->get_page());
 	}
 
 	//2-attempt best fit
@@ -1814,50 +1863,90 @@ void ItemList::force_update_list_size() {
 		int max_w = 0;
 		int max_h = 0;
 
+		int current_col_max_w = 0;
+
 		separators.clear();
 
+		// TODO wraparound_items is not being considered yet;
+		//		same_column_width is currently the default
+		//		separators is probably not correct yet;
+		//		asd
+
+		bool add_separators = true;
 		for (int i = 0; i < items.size(); i++) {
-			if (current_columns > 1 && items[i].rect_cache.size.width + ofs.x > fit_size && !auto_width && wraparound_items) {
-				// Went past.
-				current_columns = MAX(col, 1);
-				all_fit = false;
-				break;
+			if (items[i].rect_cache.size.height + ofs.y > fit_size) {
+				ofs.y = 0;
+				ofs.x += current_col_max_w;
+				max_w = MAX(max_w, ofs.x);
+				col++;
+				current_col_max_w = 0;
+
+				add_separators = false;
+				separators.erase(separators.size() - 1);
 			}
 
 			if (same_column_width) {
-				items.write[i].rect_cache.size.x = max_column_width + MAX(theme_cache.h_separation, 0);
+				items.write[i].rect_cache.size.width = max_column_width + MAX(theme_cache.h_separation, 0);
 			}
 			items.write[i].rect_cache.position = ofs;
 
-			max_h = MAX(max_h, items[i].rect_cache.size.y);
-			ofs.x += items[i].rect_cache.size.x;
-			max_w = MAX(max_w, ofs.x);
+			ofs.y += items[i].rect_cache.size.height;
+
+			max_h = MAX(max_h, items[i].rect_cache.size.height);
+			current_col_max_w = MAX(current_col_max_w, items[i].rect_cache.size.width);
 
 			items.write[i].column = col;
-			col++;
-			if (col == current_columns) {
-				if (i < items.size() - 1) {
-					separators.push_back(ofs.y + max_h);
-				}
+			current_columns = MAX(col + 1, 1);
 
-				for (int j = i; j >= 0 && col > 0; j--, col--) {
-					items.write[j].rect_cache.size.y = max_h;
-				}
-
-				ofs.x = 0;
-				ofs.y += max_h;
-				col = 0;
-				max_h = 0;
+			if (add_separators) {
+				separators.push_back(ofs.y);
 			}
 		}
+		max_w += current_col_max_w;
+
+		// for (int i = 0; i < items.size(); i++) {
+		// 	if (current_columns > 1 && items[i].rect_cache.size.height + ofs.y > fit_size && !auto_height && wraparound_items) {
+		// 		// Went past.
+		// 		current_columns = MAX(col, 1);
+		// 		all_fit = false;
+		// 		break;
+		// 	}
+		//
+		// 	if (same_column_width) {
+		// 		items.write[i].rect_cache.size.x = max_column_width + MAX(theme_cache.h_separation, 0);
+		// 	}
+		// 	items.write[i].rect_cache.position = ofs;
+		//
+		// 	max_h = MAX(max_h, items[i].rect_cache.size.y);
+		// 	ofs.x += items[i].rect_cache.size.x;
+		// 	max_w = MAX(max_w, ofs.x);
+		//
+		// 	items.write[i].column = col;
+		// 	col++;
+		// 	if (col == current_columns) {
+		// 		if (i < items.size() - 1) {
+		// 			separators.push_back(ofs.y + max_h);
+		// 		}
+		//
+		// 		// Give all elements in the same row the same height
+		// 		for (int j = i; j >= 0 && col > 0; j--, col--) {
+		// 			items.write[j].rect_cache.size.y = max_h;
+		// 		}
+		//
+		// 		ofs.x = 0;
+		// 		ofs.y += max_h;
+		// 		col = 0;
+		// 		max_h = 0;
+		// 	}
+		// }
 
 		float scroll_bar_v_page = MAX(0, size.height - theme_cache.panel_style->get_minimum_size().height);
 		float scroll_bar_v_max = MAX(scroll_bar_v_page, ofs.y + max_h);
 		float scroll_bar_h_page = MAX(0, size.width - theme_cache.panel_style->get_minimum_size().width);
 		float scroll_bar_h_max = 0;
-		if (!wraparound_items) {
+		//if (!wraparound_items) {
 			scroll_bar_h_max = MAX(scroll_bar_h_page, max_w);
-		}
+		//}
 
 		if (scroll_bar_v_page >= scroll_bar_v_max || is_layout_rtl()) {
 			fit_size -= scroll_bar_v_minwidth;
@@ -1982,7 +2071,7 @@ int ItemList::get_item_at_position(const Point2 &p_pos, bool p_exact) const {
 	for (int i = 0; i < items.size(); i++) {
 		Rect2 rc = items[i].rect_cache;
 
-		if (i % current_columns == current_columns - 1) { // Make sure you can still select the last item when clicking past the column.
+		if (items[i].column == current_columns - 1) { // Make sure you can still select the last item when clicking past the column.
 			if (is_layout_rtl()) {
 				rc.size.width = get_size().width - scroll_bar_h->get_value() + rc.position.x;
 			} else {
