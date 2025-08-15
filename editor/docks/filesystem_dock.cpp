@@ -1053,7 +1053,7 @@ void FileSystemDock::_update_file_list(bool p_keep_selection, const Vector<Strin
 	} else {
 		// No thumbnails.
 		files->set_icon_mode(ItemList::ICON_MODE_LEFT);
-		files->set_max_columns(1);
+		files->set_max_columns(0);
 		files->set_max_text_lines(1);
 		files->set_fixed_column_width(0);
 		const int icon_size = get_theme_constant(SNAME("class_icon_size"), EditorStringName(Editor));
