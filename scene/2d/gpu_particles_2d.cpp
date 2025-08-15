@@ -50,8 +50,8 @@ void GPUParticles2D::set_emitting(bool p_emitting) {
 			active = true;
 			time = 0;
 			signal_canceled = false;
-			emission_time = lifetime;
-			active_time = lifetime * (2 - explosiveness_ratio);
+			emission_time = lifetime / speed_scale;
+			active_time = (lifetime * (2 - explosiveness_ratio)) / (speed_scale * get_time_scale_value());
 		} else {
 			signal_canceled = true;
 		}
@@ -501,8 +501,8 @@ void GPUParticles2D::restart(bool p_keep_seed) {
 	active = true;
 	signal_canceled = false;
 	time = 0;
-	emission_time = lifetime;
-	active_time = lifetime * (2 - explosiveness_ratio);
+	emission_time = lifetime / speed_scale;
+	active_time = (lifetime * (2 - explosiveness_ratio)) / (speed_scale * get_time_scale_value());
 	if (one_shot) {
 		set_process_internal(true);
 	}

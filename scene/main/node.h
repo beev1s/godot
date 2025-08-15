@@ -238,6 +238,8 @@ private:
 		int process_priority = 0;
 		int physics_process_priority = 0;
 
+		float time_scale_value = 1.0;
+
 		// Keep bitpacked values together to get better packing.
 		ProcessMode process_mode : 3;
 		PhysicsInterpolationMode physics_interpolation_mode : 2;
@@ -646,6 +648,9 @@ public:
 	void set_physics_process(bool p_process);
 	double get_physics_process_delta_time() const;
 	bool is_physics_processing() const;
+
+	void set_time_scale_value(float p_time_scale);
+	float get_time_scale_value() const;
 
 	void set_process(bool p_process);
 	double get_process_delta_time() const;
