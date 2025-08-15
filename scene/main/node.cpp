@@ -104,6 +104,11 @@ void Node::_notification(int p_notification) {
 			GDVIRTUAL_CALL(_physics_process, get_physics_process_delta_time());
 		} break;
 
+		case NOTIFICATION_PARENTED: {
+			ERR_FAIL_NULL(data.parent);
+			set_time_scale_value(data.parent->data.time_scale_value);
+		} break;
+
 		case NOTIFICATION_ENTER_TREE: {
 			ERR_FAIL_NULL(get_viewport());
 			ERR_FAIL_NULL(data.tree);
@@ -1008,7 +1013,7 @@ bool Node::is_enabled() const {
 
 double Node::get_physics_process_delta_time() const {
 	if (data.tree) {
-		return data.tree->get_physics_process_time();
+		return data.tree->get_physics_process_time() * data.time_scale_value;
 	} else {
 		return 0;
 	}
@@ -1016,10 +1021,28 @@ double Node::get_physics_process_delta_time() const {
 
 double Node::get_process_delta_time() const {
 	if (data.tree) {
-		return data.tree->get_process_time();
+		return data.tree->get_process_time() * data.time_scale_value;
 	} else {
 		return 0;
 	}
+}
+
+void Node::set_time_scale_value(float p_time_scale) {
+	if (p_time_scale == data.time_scale_value) {
+		return;
+	}
+
+	data.time_scale_value = p_time_scale;
+	emit_signal(SNAME("time_scale_value_changed"), p_time_scale);
+
+
+	for (KeyValue<StringName, Node *> &K : data.children) {
+		K.value->set_time_scale_value(p_time_scale);
+	}
+}
+
+float Node::get_time_scale_value() const {
+	return data.time_scale_value;
 }
 
 void Node::set_process(bool p_process) {
@@ -3822,6 +3845,9 @@ void Node::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_process_mode"), &Node::get_process_mode);
 	ClassDB::bind_method(D_METHOD("can_process"), &Node::can_process);
 
+	ClassDB::bind_method(D_METHOD("set_time_scale_value", "time_scale"), &Node::set_time_scale_value);
+	ClassDB::bind_method(D_METHOD("get_time_scale_value"), &Node::get_time_scale_value);
+
 	ClassDB::bind_method(D_METHOD("set_process_thread_group", "mode"), &Node::set_process_thread_group);
 	ClassDB::bind_method(D_METHOD("get_process_thread_group"), &Node::get_process_thread_group);
 
@@ -4030,11 +4056,13 @@ void Node::_bind_methods() {
 	ADD_SIGNAL(MethodInfo("tree_exited"));
 	ADD_SIGNAL(MethodInfo("child_entered_tree", PropertyInfo(Variant::OBJECT, "node", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_DEFAULT, "Node")));
 	ADD_SIGNAL(MethodInfo("child_exiting_tree", PropertyInfo(Variant::OBJECT, "node", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_DEFAULT, "Node")));
-
+	
 	ADD_SIGNAL(MethodInfo("child_order_changed"));
 	ADD_SIGNAL(MethodInfo("replacing_by", PropertyInfo(Variant::OBJECT, "node", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_DEFAULT, "Node")));
 	ADD_SIGNAL(MethodInfo("editor_description_changed", PropertyInfo(Variant::OBJECT, "node", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_DEFAULT, "Node")));
 	ADD_SIGNAL(MethodInfo("editor_state_changed"));
+
+	ADD_SIGNAL(MethodInfo("time_scale_value_changed", PropertyInfo(Variant::FLOAT, "value", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_DEFAULT)));
 
 	ADD_PROPERTY(PropertyInfo(Variant::STRING_NAME, "name", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NONE), "set_name", "get_name");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "unique_name_in_owner", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NO_EDITOR), "set_unique_name_in_owner", "is_unique_name_in_owner");
@@ -4046,6 +4074,7 @@ void Node::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "process_mode", PROPERTY_HINT_ENUM, "Inherit,Pausable,When Paused,Always,Disabled"), "set_process_mode", "get_process_mode");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "process_priority"), "set_process_priority", "get_process_priority");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "process_physics_priority"), "set_physics_process_priority", "get_physics_process_priority");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "time_scale_value"), "set_time_scale_value", "get_time_scale_value");
 
 	ADD_SUBGROUP("Thread Group", "process_thread");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "process_thread_group", PROPERTY_HINT_ENUM, "Inherit,Main Thread,Sub Thread"), "set_process_thread_group", "get_process_thread_group");
